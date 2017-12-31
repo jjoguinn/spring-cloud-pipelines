@@ -84,11 +84,12 @@ applications:
     TRUST_CERTS: api.run.pivotal.io</pre><p>The <code class="literal">TRUST_CERTS</code> variable is used by the Pivotal Spring Cloud Services (Config Server, Service Registry, and Circuit Breaker Dashboard), which we are using in this example. The value specified above assumes deployment to Pivotal Web Services. Update it accordingly if you are deploying to a different Cloud Foundry foundation, or you can leave it out altogether if you are replacing the Pivotal Spring Cloud Services with alternative implementations (e.g. deploying apps and exposing them as user-provided services).</p><p>You may add additional values to the manifest files if you wish, for example if additional values are useful for any manual deployment you may still want to do, or desirable in your Spring Cloud Pipelines deployment. For example, an alternative manifest.yml for 'fortune-ui` could be as follows:</p><pre class="programlisting">---
 applications:
 - name: fortune-service
-  memory: 1024M
-  instances: 3
-  path: ./target/fortune-service-0.0.1-SNAPSHOT.jar
-  random-route: true
   timeout: 120
+  instances: 3
+  memory: 1024M
+  buildpack: https://github.com/cloudfoundry/java-buildpack.git
+  random-route: true
+  path: ./target/fortune-service-0.0.1-SNAPSHOT.jar
   services:
   - fortune-db
   - config-server
@@ -180,4 +181,286 @@ paas-prod-api-url: https://api.run.pivotal.io
 paas-prod-username: ciberkleid@pivotal.io
 paas-prod-password: my-super-secret-password
 paas-prod-org: S1Pdemo12
-paas-prod-space: scp-prod</pre></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="_1_14_update_concourse_pipeline_with_updated_credentials_files" href="#_1_14_update_concourse_pipeline_with_updated_credentials_files"></a>1.14 Update Concourse pipeline with updated credentials files</h4></div></div></div><p>Set the Concourse pipelines again, as we did previously, to update them with the values added to the credentials files. The test, stage, and prod jobs will all now succeed.</p><div class="figure"><a name="d0e6368" href="#d0e6368"></a><p class="title"><b>Figure&nbsp;14.6.&nbsp;Test, Stage, &amp; Prod Success</b></p><div class="figure-contents"><div class="mediaobject"><img src="https://raw.githubusercontent.com/spring-cloud/spring-cloud-pipelines/cf-docs/docs-sources/src/main/asciidoc/images/cf-migration/concourse_test_stage_prod_success.png" alt="concourse test stage prod success"></div></div></div><br class="figure-break"><p>On Cloud Foundry, you will now see the apps deployed in the test, stage, and prod spaces. The image below shows the deploymnet of <code class="literal">fortune-service</code> to its isolated and dedicated test space, with the 5 services declared in its manifest files (<code class="literal">sc-pipelines.yml</code> for provisioning, and <code class="literal">manifest.yml</code> for binding). It also shows the deployment of the same app to the shared prod space, including the stopped instance of the previous version. If a rollback were deemed necessary, the <code class="literal">prod-rollback</code> job in the pipeline could be triggered to remove the currently running version, remove the <code class="literal">prod/&lt;version_number&gt;</code> tag from GitHub, and re-start the former (<span class="strong"><strong>"venerable"</strong></span>) version.</p><div class="figure"><a name="d0e6397" href="#d0e6397"></a><p class="title"><b>Figure&nbsp;14.7.&nbsp;Cloud Foundry Test and Prod Deployment</b></p><div class="figure-contents"><div class="mediaobject"><img src="https://raw.githubusercontent.com/spring-cloud/spring-cloud-pipelines/cf-docs/docs-sources/src/main/asciidoc/images/cf-migration/cf_test_and_prod_deployed.png" alt="cf test and prod deployed"></div></div></div><br class="figure-break"></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="_stage_1_recap" href="#_stage_1_recap"></a>Stage 1 Recap</h4></div></div></div><p>What have we accomplished?</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">By adding the basic scaffolding needed to enable Spring Cloud Pipelines to manage the lifecycle of <code class="literal">greeting-ui</code> and <code class="literal">fortune-service</code> from source code commit to production deploy, we have made it possible for the app dev teams to instantly and easily create pipelines for each app using a common, standardized template</li><li class="listitem"><p class="simpara">We can count on the pipelines to:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem">automatically provision services in test spaces, and optionally in stage as well</li><li class="listitem">dynamically clean up the test spaces between pipeline executions</li><li class="listitem">upload the app artifacts to the maven repo (Bintray)</li><li class="listitem">tag the GitHub repositories with <code class="literal">dev/&lt;version_number&gt;</code> and <code class="literal">prod/&lt;version_number&gt;</code></li></ul></div></li><li class="listitem">After each successful pipeline run, we are in a position to roll back to the last deployed version using the <code class="literal">prod-rollback</code> job, if necessary</li></ul></div><p>Next steps:</p><p>These accomplishments are extremely valuable, but in order to derive confidence and reliability from the pipelines, we need to incorporate testing. We do this in Stage 2 of the app migration.</p></div></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="_stage_2_tests" href="#_stage_2_tests"></a>14.7.3&nbsp;Stage 2: Tests</h3></div></div></div><p>In this stage, we add tests and test profiles&#8230;&#8203;</p></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="_stage_3_contracts" href="#_stage_3_contracts"></a>14.7.4&nbsp;Stage 3: Contracts</h3></div></div></div></div></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="multi__the_demo_setup_kubernetes.html">Prev</a>&nbsp;</td><td width="20%" align="center">&nbsp;</td><td width="40%" align="right">&nbsp;<a accesskey="n" href="multi__building_the_project.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">13.&nbsp;The demo setup (Kubernetes)&nbsp;</td><td width="20%" align="center"><a accesskey="h" href="multi_spring-cloud-pipelines.html">Home</a></td><td width="40%" align="right" valign="top">&nbsp;15.&nbsp;Building the project</td></tr></table></div></body></html>
+paas-prod-space: scp-prod</pre></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="_1_14_update_concourse_pipeline_with_updated_credentials_files" href="#_1_14_update_concourse_pipeline_with_updated_credentials_files"></a>1.14 Update Concourse pipeline with updated credentials files</h4></div></div></div><p>Set the Concourse pipelines again, as we did previously, to update them with the values added to the credentials files. The test, stage, and prod jobs will all now succeed.</p><div class="figure"><a name="d0e6368" href="#d0e6368"></a><p class="title"><b>Figure&nbsp;14.6.&nbsp;Test, Stage, &amp; Prod Success</b></p><div class="figure-contents"><div class="mediaobject"><img src="https://raw.githubusercontent.com/spring-cloud/spring-cloud-pipelines/cf-docs/docs-sources/src/main/asciidoc/images/cf-migration/concourse_test_stage_prod_success.png" alt="concourse test stage prod success"></div></div></div><br class="figure-break"><p>On Cloud Foundry, you will now see the apps deployed in the test, stage, and prod spaces. The image below shows the deploymnet of <code class="literal">fortune-service</code> to its isolated and dedicated test space, with the 5 services declared in its manifest files (<code class="literal">sc-pipelines.yml</code> for provisioning, and <code class="literal">manifest.yml</code> for binding). It also shows the deployment of the same app to the shared prod space, including the stopped instance of the previous version. If a rollback were deemed necessary, the <code class="literal">prod-rollback</code> job in the pipeline could be triggered to remove the currently running version, remove the <code class="literal">prod/&lt;version_number&gt;</code> tag from GitHub, and re-start the former (<span class="strong"><strong>"venerable"</strong></span>) version.</p><div class="figure"><a name="d0e6397" href="#d0e6397"></a><p class="title"><b>Figure&nbsp;14.7.&nbsp;Cloud Foundry Test and Prod Deployment</b></p><div class="figure-contents"><div class="mediaobject"><img src="https://raw.githubusercontent.com/spring-cloud/spring-cloud-pipelines/cf-docs/docs-sources/src/main/asciidoc/images/cf-migration/cf_test_and_prod_deployed.png" alt="cf test and prod deployed"></div></div></div><br class="figure-break"></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="_stage_1_recap" href="#_stage_1_recap"></a>Stage 1 Recap</h4></div></div></div><p>What have we accomplished?</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">By adding the basic scaffolding needed to enable Spring Cloud Pipelines to manage the lifecycle of <code class="literal">greeting-ui</code> and <code class="literal">fortune-service</code> from source code commit to production deploy, we have made it possible for the app dev teams to instantly and easily create pipelines for each app using a common, standardized template</li><li class="listitem"><p class="simpara">We can count on the pipelines to:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem">automatically provision services in test spaces, and optionally in stage as well</li><li class="listitem">dynamically clean up the test spaces between pipeline executions</li><li class="listitem">upload the app artifacts to the maven repo (Bintray)</li><li class="listitem">tag the GitHub repositories with <code class="literal">dev/&lt;version_number&gt;</code> and <code class="literal">prod/&lt;version_number&gt;</code></li></ul></div></li><li class="listitem">After each successful pipeline run, we are in a position to roll back to the last deployed version using the <code class="literal">prod-rollback</code> job, if necessary</li></ul></div><p>Next steps:</p><p>These accomplishments are extremely valuable, but in order to derive confidence and reliability from the pipelines, we need to incorporate testing. We do this in Stage 2 of the app migration.</p></div></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="_stage_2_tests" href="#_stage_2_tests"></a>14.7.3&nbsp;Stage 2: Tests</h3></div></div></div><p>In this stage, we enable Spring Cloud Pipelines to execute tests so that we can increase confidence in the code being deployed. We do so by adding test profiles to the pom.xml files, and then organizing and/or adding tests in a way that corresponds to the profiles. By doing so, we are establishing standards around testing across development teams in the enterprise.</p><p>We will also enable database schema versioning in this stage, thereby providing the foundation for rollback testing during schema changes.</p><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="_2_1_add_maven_profiles" href="#_2_1_add_maven_profiles"></a>2.1 Add Maven profiles</h4></div></div></div><p>For both <code class="literal">greeting-ui</code> and <code class="literal">fortune-service</code>, add a <code class="literal">profiles</code> section to the <code class="literal">pom.xml</code> file, as shown below. Note that we are adding four profiles:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p class="simpara">default</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem">For unit and integration tests. Note that this profile includes all tests except those that will explicitly be called by the smoke and e2e profiles.</li><li class="listitem">Tests matching this profile will be executed during the build-and-upload job</li></ul></div></li><li class="listitem"><p class="simpara">apicompatibility</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem">For ensuring backward compatibility in case of API changes. Note that this is not effective until Stage 3, when we will add contracts. However, we add this profile now to ensure the api-compatibility-check job does not execute other tests.</li></ul></div></li><li class="listitem"><p class="simpara">smoke</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem">For tests to be run against the app deployed in the test space.</li></ul></div></li><li class="listitem"><p class="simpara">e2e</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem">For tests to be run against the app deployed in the stage space.</li></ul></div></li></ul></div><pre class="programlisting">  <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;profiles&gt;</span>
+    <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;profile&gt;</span>
+      <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;id&gt;</span>default<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/id&gt;</span>
+      <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;activation&gt;</span>
+        <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;activeByDefault&gt;</span>true<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/activeByDefault&gt;</span>
+      <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/activation&gt;</span>
+      <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;build&gt;</span>
+        <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;plugins&gt;</span>
+          <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;plugin&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;groupId&gt;</span>org.apache.maven.plugins<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/groupId&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;artifactId&gt;</span>maven-surefire-plugin<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/artifactId&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;configuration&gt;</span>
+              <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;includes&gt;</span>
+                <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;include&gt;</span>**/*Tests.java<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/include&gt;</span>
+                <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;include&gt;</span>**/*Test.java<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/include&gt;</span>
+              <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/includes&gt;</span>
+              <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;excludes&gt;</span>
+                <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;exclude&gt;</span>**/smoke/**<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/exclude&gt;</span>
+                <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;exclude&gt;</span>**/e2e/**<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/exclude&gt;</span>
+              <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/excludes&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/configuration&gt;</span>
+          <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/plugin&gt;</span>
+          <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;plugin&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;groupId&gt;</span>org.springframework.boot<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/groupId&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;artifactId&gt;</span>spring-boot-maven-plugin<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/artifactId&gt;</span>
+          <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/plugin&gt;</span>
+        <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/plugins&gt;</span>
+      <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/build&gt;</span>
+    <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/profile&gt;</span>
+    <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;profile&gt;</span>
+      <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;id&gt;</span>apicompatibility<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/id&gt;</span>
+      <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;build&gt;</span>
+        <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;plugins&gt;</span>
+          <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;plugin&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;groupId&gt;</span>org.apache.maven.plugins<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/groupId&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;artifactId&gt;</span>maven-surefire-plugin<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/artifactId&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;configuration&gt;</span>
+              <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;includes&gt;</span>
+                <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;include&gt;</span>**/contracttests/**/*Tests.java<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/include&gt;</span>
+                <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;include&gt;</span>**/contracttests/**/*Test.java<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/include&gt;</span>
+              <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/includes&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/configuration&gt;</span>
+          <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/plugin&gt;</span>
+        <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/plugins&gt;</span>
+      <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/build&gt;</span>
+    <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/profile&gt;</span>
+    <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;profile&gt;</span>
+      <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;id&gt;</span>smoke<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/id&gt;</span>
+      <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;build&gt;</span>
+        <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;plugins&gt;</span>
+          <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;plugin&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;groupId&gt;</span>org.apache.maven.plugins<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/groupId&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;artifactId&gt;</span>maven-surefire-plugin<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/artifactId&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;configuration&gt;</span>
+              <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;includes&gt;</span>
+                <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;include&gt;</span>smoke/**/*Tests.java<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/include&gt;</span>
+                <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;include&gt;</span>smoke/**/*Test.java<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/include&gt;</span>
+              <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/includes&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/configuration&gt;</span>
+          <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/plugin&gt;</span>
+        <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/plugins&gt;</span>
+      <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/build&gt;</span>
+    <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/profile&gt;</span>
+    <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;profile&gt;</span>
+      <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;id&gt;</span>e2e<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/id&gt;</span>
+      <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;build&gt;</span>
+        <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;plugins&gt;</span>
+          <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;plugin&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;groupId&gt;</span>org.apache.maven.plugins<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/groupId&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;artifactId&gt;</span>maven-surefire-plugin<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/artifactId&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;configuration&gt;</span>
+              <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;includes&gt;</span>
+                <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;include&gt;</span>e2e/**/*Tests.java<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/include&gt;</span>
+                <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;include&gt;</span>e2e/**/*Test.java<span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/include&gt;</span>
+              <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/includes&gt;</span>
+            <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/configuration&gt;</span>
+          <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/plugin&gt;</span>
+        <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/plugins&gt;</span>
+      <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/build&gt;</span>
+    <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/profile&gt;</span>
+  <span xmlns:d="http://docbook.org/ns/docbook" class="hl-tag">&lt;/profiles&gt;</span></pre></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="_2_2_add_organize_tests" href="#_2_2_add_organize_tests"></a>2.2 Add/organize tests</h4></div></div></div><p>Next, we ensure that we have a matching test package structure in our apps:</p><div class="figure"><a name="d0e6515" href="#d0e6515"></a><p class="title"><b>Figure&nbsp;14.8.&nbsp;Test Package Structure</b></p><div class="figure-contents"><div class="mediaobject"><img src="https://raw.githubusercontent.com/spring-cloud/spring-cloud-pipelines/cf-docs/docs-sources/src/main/asciidoc/images/cf-migration/test_package_structure.png" alt="test package structure"></div></div></div><br class="figure-break"><p>Note that we are creating matching packages for the default, smoke, and e2e profiles only. We will address the package for the apicompatibility profile in Stage 3.</p><p>When working with your own apps, if you have existing tests, you would now move them into one of these packages now, and rename them so that they are included in the filters declared in the profiles (i.e. the file names end in <code class="literal">Test.java</code> or <code class="literal">Tests.java</code>)</p><p>In the case of our sample apps, there are no tests, so we add some now as follows.</p><p><span class="strong"><strong>fortune-service default tests</strong></span></p><p>Add your unit and integration tests so that they match the default profile as defined in the <code class="literal">fortune-service</code> <code class="literal">pom.xml</code> file. These will be executed on Concourse against the <code class="literal">fortune-service</code> application running on the Concourse worker in the <code class="literal">build-and-upload</code> job.</p><p>As an example, we will add two tests, one that loads the context, and another that verifies the number of rows expected in the database:</p><pre class="programlisting"><span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">package</span> io.pivotal;
+
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.junit.Test;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.junit.runner.RunWith;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.beans.factory.annotation.Autowired;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.boot.test.context.SpringBootTest;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.test.context.junit4.SpringRunner;
+
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.jdbc.core.JdbcTemplate;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">static</span> org.assertj.core.api.Assertions.assertThat;
+
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">static</span> org.junit.Assert.*;
+
+<em><span class="hl-annotation" style="color: gray">@RunWith(SpringRunner.class)</span></em>
+<em><span class="hl-annotation" style="color: gray">@SpringBootTest(classes = FortuneServiceApplication.class)</span></em>
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">public</span> <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">class</span> FortuneServiceApplicationTests {
+
+    <em><span class="hl-annotation" style="color: gray">@Test</span></em>
+    <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">public</span> <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">void</span> contextLoads() <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">throws</span> Exception {
+
+    }
+
+    <em><span class="hl-annotation" style="color: gray">@Autowired</span></em>
+    <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">private</span> JdbcTemplate template;
+
+    <em><span class="hl-annotation" style="color: gray">@Test</span></em>
+    <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">public</span> <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">void</span> testDefaultSettings() <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">throws</span> Exception {
+        assertThat(<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">this</span>.template.queryForObject(<span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"SELECT COUNT(*) from FORTUNE"</span>,
+                Integer.<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">class</span>)).isEqualTo(<span class="hl-number">7</span>);
+    }
+
+}</pre><p><span class="strong"><strong>fortune-service smoke tests</strong></span></p><p>Add your smoke tests so that they match the smoke profile as defined in the <code class="literal">fortune-service</code> <code class="literal">pom.xml</code> file. These will be executed on Concourse against the <code class="literal">fortune-service</code> application deployed in the Cloud Foundry <code class="literal">scp-test-fortune-service</code> space. Two versions of these tests are executed against the app:</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem">the current version, in the <code class="literal">test-smoke</code> job</li><li class="listitem">the latest prod version, in the <code class="literal">test-rollback-smoke</code> job</li></ol></div><div class="figure"><a name="d0e6587" href="#d0e6587"></a><p class="title"><b>Figure&nbsp;14.9.&nbsp;fortune-service Smoke Tests</b></p><div class="figure-contents"><div class="mediaobject"><img src="https://raw.githubusercontent.com/spring-cloud/spring-cloud-pipelines/cf-docs/docs-sources/src/main/asciidoc/images/cf-migration/fortune_service_smoke_tests.png" alt="fortune service smoke tests"></div></div></div><br class="figure-break"><p>In the test environment, we choose to verify that <code class="literal">fortune-service</code> is retrieving a fortune from <code class="literal">fortune-db</code>, and not returning its Hystrix fallback response:</p><pre class="programlisting"><span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">package</span> smoke;
+
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.assertj.core.api.BDDAssertions;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.junit.Test;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.junit.runner.RunWith;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.beans.factory.annotation.Value;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.boot.test.context.SpringBootTest;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.http.ResponseEntity;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.test.context.junit4.SpringRunner;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.web.client.RestTemplate;
+
+<em><span class="hl-annotation" style="color: gray">@RunWith(SpringRunner.class)</span></em>
+<em><span class="hl-annotation" style="color: gray">@SpringBootTest(classes = SmokeTests.class,
+        webEnvironment = SpringBootTest.WebEnvironment.NONE)</span></em>
+<em><span class="hl-annotation" style="color: gray">@EnableAutoConfiguration</span></em>
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">public</span> <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">class</span> SmokeTests {
+
+	<em><span class="hl-annotation" style="color: gray">@Value("${application.url}")</span></em> String applicationUrl;
+
+	RestTemplate restTemplate = <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">new</span> RestTemplate();
+
+	<em><span class="hl-annotation" style="color: gray">@Test</span></em>
+	<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">public</span> <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">void</span> should_return_a_fortune() {
+		ResponseEntity&lt;String&gt; response = <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">this</span>.restTemplate
+				.getForEntity(<span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"http://"</span> + <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">this</span>.applicationUrl + <span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"/"</span>, String.<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">class</span>);
+
+		BDDAssertions.then(response.getStatusCodeValue()).isEqualTo(<span class="hl-number">200</span>);
+
+		<span xmlns:d="http://docbook.org/ns/docbook" class="hl-comment">// Filter out the known Hystrix fallback response</span>
+		BDDAssertions.then(response.getBody()).doesNotContain(<span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"The fortuneteller will be back soon."</span>);
+	}
+
+}</pre><p><span class="strong"><strong>fortune-service e2e tests</strong></span></p><p>Add your e2e tests so that they match the e2e profile as defined in the <code class="literal">fortune-service</code> <code class="literal">pom.xml</code> file. These will be executed on Concourse against the <code class="literal">fortune-service</code> application deployed in the Cloud Foundry <code class="literal">scp-stage</code> space. This space is shared, so we assume <code class="literal">greeting-ui</code> is also present.</p><div class="figure"><a name="d0e6626" href="#d0e6626"></a><p class="title"><b>Figure&nbsp;14.10.&nbsp;fortune-service E2E Tests</b></p><div class="figure-contents"><div class="mediaobject"><img src="https://raw.githubusercontent.com/spring-cloud/spring-cloud-pipelines/cf-docs/docs-sources/src/main/asciidoc/images/cf-migration/fortune_service_e2e_tests.png" alt="fortune service e2e tests"></div></div></div><br class="figure-break"><p>In the e2e environment, we choose to use a string replacement to obtain the URL for <code class="literal">greeting-ui</code>. We also choose to verify that we are hitting <code class="literal">fortune-db</code> and not receiving Hystrix fallback responses from either application:</p><pre class="programlisting"><span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">package</span> e2e;
+
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.assertj.core.api.BDDAssertions;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.junit.Test;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.junit.runner.RunWith;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.slf4j.Logger;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.slf4j.LoggerFactory;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.beans.factory.annotation.Value;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.boot.test.context.SpringBootTest;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.http.ResponseEntity;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.test.context.junit4.SpringRunner;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.web.client.RestTemplate;
+
+<em><span class="hl-annotation" style="color: gray">@RunWith(SpringRunner.class)</span></em>
+<em><span class="hl-annotation" style="color: gray">@SpringBootTest(classes = E2eTests.class,
+		webEnvironment = SpringBootTest.WebEnvironment.NONE)</span></em>
+<em><span class="hl-annotation" style="color: gray">@EnableAutoConfiguration</span></em>
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">public</span> <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">class</span> E2eTests {
+
+
+	<span xmlns:d="http://docbook.org/ns/docbook" class="hl-comment">// The app is running in CF but the tests are executed from Concourse worker,</span>
+	<span xmlns:d="http://docbook.org/ns/docbook" class="hl-comment">// so the test will deduce the url to greeting-ui: it will assume the same host</span>
+	<span xmlns:d="http://docbook.org/ns/docbook" class="hl-comment">// as fortune-service, and simply replace "fortune-service" with "greeting-ui" in the url</span>
+
+	Logger logger = LoggerFactory
+			.getLogger(E2eTests.<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">class</span>);
+
+	<em><span class="hl-annotation" style="color: gray">@Value("${application.url}")</span></em> String applicationUrl;
+
+	RestTemplate restTemplate = <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">new</span> RestTemplate();
+
+	<em><span class="hl-annotation" style="color: gray">@Test</span></em>
+	<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">public</span> <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">void</span> should_return_a_fortune() {
+		ResponseEntity&lt;String&gt; response = <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">this</span>.restTemplate
+				.getForEntity(<span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"http://"</span> + <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">this</span>.applicationUrl.replace(<span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"fortune-service"</span>, <span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"greeting-ui"</span>) + <span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"/"</span>, String.<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">class</span>);
+
+		logger.info(<span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"Response: [{}]"</span>, response);
+		BDDAssertions.then(response.getStatusCodeValue()).isEqualTo(<span class="hl-number">200</span>);
+
+		<span xmlns:d="http://docbook.org/ns/docbook" class="hl-comment">// Filter out the known Hystrix fallback responses from both fortune and greeting</span>
+		BDDAssertions.then(response.getBody()).doesNotContain(<span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"This fortune is no good. Try another."</span>).doesNotContain(<span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"The fortuneteller will be back soon."</span>);
+	}
+
+}</pre><p><span class="strong"><strong>greeting-ui default tests</strong></span></p><p>Add your unit and integration tests so that they match the default profile as defined in the <code class="literal">greeting-ui</code> <code class="literal">pom.xml</code> file. These will be executed on Concourse against the <code class="literal">greeting-ui</code> application running on the Concourse worker in the <code class="literal">build-and-upload</code> job.</p><p>As an example, we will add one test that loads the context:</p><pre class="programlisting"><span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">package</span> io.pivotal;
+
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.junit.Test;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.junit.runner.RunWith;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.boot.test.context.SpringBootTest;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.test.context.junit4.SpringRunner;
+
+<em><span class="hl-annotation" style="color: gray">@RunWith(SpringRunner.class)</span></em>
+<em><span class="hl-annotation" style="color: gray">@SpringBootTest(classes = GreetingUIApplication.class)</span></em>
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">public</span> <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">class</span> GreetingUIApplicationTests {
+
+    <em><span class="hl-annotation" style="color: gray">@Test</span></em>
+    <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">public</span> <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">void</span> contextLoads() <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">throws</span> Exception {
+
+    }
+
+}</pre><p><span class="strong"><strong>greeting-ui smoke tests</strong></span></p><p>Add your smoke tests so that they match the smoke profile as defined in the <code class="literal">greeting-ui</code> <code class="literal">pom.xml</code> file. These will be executed on Concourse against the <code class="literal">greeting-ui</code> application deployed in the Cloud Foundry <code class="literal">scp-test-greeting-ui</code> space. Two versions of these tests are executed against the app:</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem">the current version, in the <code class="literal">test-smoke</code> job</li><li class="listitem">the latest prod version, in the <code class="literal">test-rollback-smoke</code> job</li></ol></div><div class="figure"><a name="d0e6696" href="#d0e6696"></a><p class="title"><b>Figure&nbsp;14.11.&nbsp;greeting-ui Smoke Tests</b></p><div class="figure-contents"><div class="mediaobject"><img src="https://raw.githubusercontent.com/spring-cloud/spring-cloud-pipelines/cf-docs/docs-sources/src/main/asciidoc/images/cf-migration/greeting_ui_smoke_tests.png" alt="greeting ui smoke tests"></div></div></div><br class="figure-break"><p>Since <code class="literal">fortune-service</code> is not deployed to the <code class="literal">scp-test-greeting-ui</code> space, we expect to receive the Hystrix fallback response defined in <code class="literal">greeting-ui</code>. Hence, our smoke test validates that condition:</p><pre class="programlisting"><span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">package</span> smoke;
+
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.assertj.core.api.BDDAssertions;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.junit.Test;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.junit.runner.RunWith;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.slf4j.Logger;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.slf4j.LoggerFactory;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.beans.factory.annotation.Value;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.boot.test.context.SpringBootTest;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.http.ResponseEntity;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.test.context.junit4.SpringRunner;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.web.client.RestTemplate;
+
+<em><span class="hl-annotation" style="color: gray">@RunWith(SpringRunner.class)</span></em>
+<em><span class="hl-annotation" style="color: gray">@SpringBootTest(classes = SmokeTests.class,
+        webEnvironment = SpringBootTest.WebEnvironment.NONE)</span></em>
+<em><span class="hl-annotation" style="color: gray">@EnableAutoConfiguration</span></em>
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">public</span> <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">class</span> SmokeTests {
+
+    Logger logger = LoggerFactory
+            .getLogger(SmokeTests.<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">class</span>);
+
+    <em><span class="hl-annotation" style="color: gray">@Value("${application.url}")</span></em> String applicationUrl;
+
+    RestTemplate restTemplate = <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">new</span> RestTemplate();
+
+    <em><span class="hl-annotation" style="color: gray">@Test</span></em>
+    <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">public</span> <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">void</span> should_return_a_fallback_fortune() {
+        ResponseEntity&lt;String&gt; response = <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">this</span>.restTemplate
+                .getForEntity(<span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"http://"</span> + <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">this</span>.applicationUrl + <span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"/"</span>, String.<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">class</span>);
+
+        logger.info(<span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"Response: [{}]"</span>, response);
+        BDDAssertions.then(response.getStatusCodeValue()).isEqualTo(<span class="hl-number">200</span>);
+
+        <span xmlns:d="http://docbook.org/ns/docbook" class="hl-comment">// Expect the hystrix fallback response</span>
+        BDDAssertions.then(response.getBody()).contains(<span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"This fortune is no good. Try another."</span>);
+    }
+
+}</pre><p><span class="strong"><strong>greeting-ui e2e tests</strong></span></p><p>Add your e2e tests so that they match the e2e profile as defined in the <code class="literal">greeting-ui</code> <code class="literal">pom.xml</code> file. These will be executed on Concourse against the <code class="literal">greeting-ui</code> application deployed in the Cloud Foundry <code class="literal">scp-stage</code> space. This space is shared, so we assume <code class="literal">fortune-service</code> is also present.</p><div class="figure"><a name="d0e6738" href="#d0e6738"></a><p class="title"><b>Figure&nbsp;14.12.&nbsp;greeting-ui E2E Tests</b></p><div class="figure-contents"><div class="mediaobject"><img src="https://raw.githubusercontent.com/spring-cloud/spring-cloud-pipelines/cf-docs/docs-sources/src/main/asciidoc/images/cf-migration/greeting_ui_e2e_tests.png" alt="greeting ui e2e tests"></div></div></div><br class="figure-break"><p>In the e2e environment, we choose to verify that we are hitting <code class="literal">fortune-service</code> and not receiving the Hystrix fallback response from <code class="literal">greeting-ui</code>:</p><pre class="programlisting"><span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">package</span> e2e;
+
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.assertj.core.api.BDDAssertions;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.junit.Test;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.junit.runner.RunWith;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.slf4j.Logger;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.slf4j.LoggerFactory;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.beans.factory.annotation.Value;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.boot.test.context.SpringBootTest;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.http.ResponseEntity;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.test.context.junit4.SpringRunner;
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">import</span> org.springframework.web.client.RestTemplate;
+
+<em><span class="hl-annotation" style="color: gray">@RunWith(SpringRunner.class)</span></em>
+<em><span class="hl-annotation" style="color: gray">@SpringBootTest(classes = E2eTests.class,
+        webEnvironment = SpringBootTest.WebEnvironment.NONE)</span></em>
+<em><span class="hl-annotation" style="color: gray">@EnableAutoConfiguration</span></em>
+<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">public</span> <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">class</span> E2eTests {
+
+    Logger logger = LoggerFactory
+            .getLogger(E2eTests.<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">class</span>);
+
+    <em><span class="hl-annotation" style="color: gray">@Value("${application.url}")</span></em> String applicationUrl;
+
+    RestTemplate restTemplate = <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">new</span> RestTemplate();
+
+    <em><span class="hl-annotation" style="color: gray">@Test</span></em>
+    <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">public</span> <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">void</span> should_return_a_fortune() {
+        ResponseEntity&lt;String&gt; response = <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">this</span>.restTemplate
+                .getForEntity(<span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"http://"</span> + <span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">this</span>.applicationUrl + <span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"/"</span>, String.<span xmlns:d="http://docbook.org/ns/docbook" class="hl-keyword">class</span>);
+
+        logger.info(<span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"Response: [{}]"</span>, response);
+        BDDAssertions.then(response.getStatusCodeValue()).isEqualTo(<span class="hl-number">200</span>);
+
+        <span xmlns:d="http://docbook.org/ns/docbook" class="hl-comment">// Filter out the known Hystrix fallback response</span>
+        BDDAssertions.then(response.getBody()).doesNotContain(<span xmlns:d="http://docbook.org/ns/docbook" class="hl-string">"This fortune is no good. Try another."</span>);
+    }
+
+}</pre></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="_2_3_add_database_versioning" href="#_2_3_add_database_versioning"></a>2.3 Add database versioning</h4></div></div></div></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="_2_4" href="#_2_4"></a>2.4 &#8230;&#8203;</h4></div></div></div></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="_2_5" href="#_2_5"></a>2.5 &#8230;&#8203;</h4></div></div></div></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="_stage_2_recap" href="#_stage_2_recap"></a>Stage 2 Recap</h4></div></div></div><p>What have we accomplished?</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p class="simpara">Blah</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem">Blah Blah</li></ul></div></li></ul></div><p>Next steps:</p><p>Blah blah blah</p></div></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="_stage_3_contracts" href="#_stage_3_contracts"></a>14.7.4&nbsp;Stage 3: Contracts</h3></div></div></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="_stage_3_recap" href="#_stage_3_recap"></a>Stage 3 Recap</h4></div></div></div><p>What have we accomplished?</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p class="simpara">Blah</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem">Blah Blah</li></ul></div></li></ul></div><p>Next steps:</p><p>Blah blah blah</p></div></div></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="multi__the_demo_setup_kubernetes.html">Prev</a>&nbsp;</td><td width="20%" align="center">&nbsp;</td><td width="40%" align="right">&nbsp;<a accesskey="n" href="multi__building_the_project.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">13.&nbsp;The demo setup (Kubernetes)&nbsp;</td><td width="20%" align="center"><a accesskey="h" href="multi_spring-cloud-pipelines.html">Home</a></td><td width="40%" align="right" valign="top">&nbsp;15.&nbsp;Building the project</td></tr></table></div></body></html>

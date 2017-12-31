@@ -276,11 +276,12 @@ You may add additional values to the manifest files if you wish, for example if 
 ---
 applications:
 - name: fortune-service
-  memory: 1024M
-  instances: 3
-  path: ./target/fortune-service-0.0.1-SNAPSHOT.jar
-  random-route: true
   timeout: 120
+  instances: 3
+  memory: 1024M
+  buildpack: https://github.com/cloudfoundry/java-buildpack.git
+  random-route: true
+  path: ./target/fortune-service-0.0.1-SNAPSHOT.jar
   services:
   - fortune-db
   - config-server
@@ -466,6 +467,421 @@ These accomplishments are extremely valuable, but in order to derive confidence 
 
 ==== Stage 2: Tests
 
-In this stage, we add tests and test profiles...
+In this stage, we enable Spring Cloud Pipelines to execute tests so that we can increase confidence in the code being deployed. We do so by adding test profiles to the pom.xml files, and then organizing and/or adding tests in a way that corresponds to the profiles. By doing so, we are establishing standards around testing across development teams in the enterprise.
+
+We will also enable database schema versioning in this stage, thereby providing the foundation for rollback testing during schema changes.
+
+===== 2.1 Add Maven profiles
+
+For both `greeting-ui` and `fortune-service`, add a `profiles` section to the `pom.xml` file, as shown below. Note that we are adding four profiles:
+
+* default
+** For unit and integration tests. Note that this profile includes all tests except those that will explicitly be called by the smoke and e2e profiles.
+** Tests matching this profile will be executed during the build-and-upload job
+* apicompatibility
+** For ensuring backward compatibility in case of API changes. Note that this is not effective until Stage 3, when we will add contracts. However, we add this profile now to ensure the api-compatibility-check job does not execute other tests.
+* smoke
+** For tests to be run against the app deployed in the test space.
+* e2e
+** For tests to be run against the app deployed in the stage space.
+
+```xml
+  <profiles>
+    <profile>
+      <id>default</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <includes>
+                <include>**/*Tests.java</include>
+                <include>**/*Test.java</include>
+              </includes>
+              <excludes>
+                <exclude>**/smoke/**</exclude>
+                <exclude>**/e2e/**</exclude>
+              </excludes>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>apicompatibility</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <includes>
+                <include>**/contracttests/**/*Tests.java</include>
+                <include>**/contracttests/**/*Test.java</include>
+              </includes>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>smoke</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <includes>
+                <include>smoke/**/*Tests.java</include>
+                <include>smoke/**/*Test.java</include>
+              </includes>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>e2e</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <includes>
+                <include>e2e/**/*Tests.java</include>
+                <include>e2e/**/*Test.java</include>
+              </includes>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+```
+
+===== 2.2 Add/organize tests
+
+Next, we ensure that we have a matching test package structure in our apps:
+
+image::{cf-migration-root-docs}/test_package_structure.png[title="Test Package Structure"]
+
+Note that we are creating matching packages for the default, smoke, and e2e profiles only. We will address the package for the apicompatibility profile in Stage 3.
+
+When working with your own apps, if you have existing tests, you would now move them into one of these packages now, and rename them so that they are included in the filters declared in the profiles (i.e. the file names end in `Test.java` or `Tests.java`)
+
+In the case of our sample apps, there are no tests, so we add some now as follows.
+
+*fortune-service default tests*
+
+Add your unit and integration tests so that they match the default profile as defined in the `fortune-service` `pom.xml` file. These will be executed on Concourse against the `fortune-service` application running on the Concourse worker in the `build-and-upload` job.
+
+As an example, we will add two tests, one that loads the context, and another that verifies the number of rows expected in the database:
+
+```java
+package io.pivotal;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.junit4.SpringRunner;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import static org.junit.Assert.*;
+
+@RunWith(SpringRunner.class)
+@SpringBootTest(classes = FortuneServiceApplication.class)
+public class FortuneServiceApplicationTests {
+
+    @Test
+    public void contextLoads() throws Exception {
+
+    }
+
+    @Autowired
+    private JdbcTemplate template;
+
+    @Test
+    public void testDefaultSettings() throws Exception {
+        assertThat(this.template.queryForObject("SELECT COUNT(*) from FORTUNE",
+                Integer.class)).isEqualTo(7);
+    }
+
+}
+```
+
+*fortune-service smoke tests*
+
+Add your smoke tests so that they match the smoke profile as defined in the `fortune-service` `pom.xml` file. These will be executed on Concourse against the `fortune-service` application deployed in the Cloud Foundry `scp-test-fortune-service` space. Two versions of these tests are executed against the app:
+
+. the current version, in the `test-smoke` job
+. the latest prod version, in the `test-rollback-smoke` job
+
+image::{cf-migration-root-docs}/fortune_service_smoke_tests.png[title="fortune-service Smoke Tests"]
+
+In the test environment, we choose to verify that `fortune-service` is retrieving a fortune from `fortune-db`, and not returning its Hystrix fallback response:
+
+```java
+package smoke;
+
+import org.assertj.core.api.BDDAssertions;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.web.client.RestTemplate;
+
+@RunWith(SpringRunner.class)
+@SpringBootTest(classes = SmokeTests.class,
+        webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@EnableAutoConfiguration
+public class SmokeTests {
+
+	@Value("${application.url}") String applicationUrl;
+
+	RestTemplate restTemplate = new RestTemplate();
+
+	@Test
+	public void should_return_a_fortune() {
+		ResponseEntity<String> response = this.restTemplate
+				.getForEntity("http://" + this.applicationUrl + "/", String.class);
+
+		BDDAssertions.then(response.getStatusCodeValue()).isEqualTo(200);
+
+		// Filter out the known Hystrix fallback response
+		BDDAssertions.then(response.getBody()).doesNotContain("The fortuneteller will be back soon.");
+	}
+
+}
+```
+
+*fortune-service e2e tests*
+
+Add your e2e tests so that they match the e2e profile as defined in the `fortune-service` `pom.xml` file. These will be executed on Concourse against the `fortune-service` application deployed in the Cloud Foundry `scp-stage` space. This space is shared, so we assume `greeting-ui` is also present.
+
+image::{cf-migration-root-docs}/fortune_service_e2e_tests.png[title="fortune-service E2E Tests"]
+
+In the e2e environment, we choose to use a string replacement to obtain the URL for `greeting-ui`. We also choose to verify that we are hitting `fortune-db` and not receiving Hystrix fallback responses from either application:
+
+```java
+package e2e;
+
+import org.assertj.core.api.BDDAssertions;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.web.client.RestTemplate;
+
+@RunWith(SpringRunner.class)
+@SpringBootTest(classes = E2eTests.class,
+		webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@EnableAutoConfiguration
+public class E2eTests {
+
+
+	// The app is running in CF but the tests are executed from Concourse worker,
+	// so the test will deduce the url to greeting-ui: it will assume the same host
+	// as fortune-service, and simply replace "fortune-service" with "greeting-ui" in the url
+
+	Logger logger = LoggerFactory
+			.getLogger(E2eTests.class);
+
+	@Value("${application.url}") String applicationUrl;
+
+	RestTemplate restTemplate = new RestTemplate();
+
+	@Test
+	public void should_return_a_fortune() {
+		ResponseEntity<String> response = this.restTemplate
+				.getForEntity("http://" + this.applicationUrl.replace("fortune-service", "greeting-ui") + "/", String.class);
+
+		logger.info("Response: [{}]", response);
+		BDDAssertions.then(response.getStatusCodeValue()).isEqualTo(200);
+
+		// Filter out the known Hystrix fallback responses from both fortune and greeting
+		BDDAssertions.then(response.getBody()).doesNotContain("This fortune is no good. Try another.").doesNotContain("The fortuneteller will be back soon.");
+	}
+
+}
+```
+
+*greeting-ui default tests*
+
+Add your unit and integration tests so that they match the default profile as defined in the `greeting-ui` `pom.xml` file. These will be executed on Concourse against the `greeting-ui` application running on the Concourse worker in the `build-and-upload` job.
+
+As an example, we will add one test that loads the context:
+
+```java
+package io.pivotal;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.junit4.SpringRunner;
+
+@RunWith(SpringRunner.class)
+@SpringBootTest(classes = GreetingUIApplication.class)
+public class GreetingUIApplicationTests {
+
+    @Test
+    public void contextLoads() throws Exception {
+
+    }
+
+}
+```
+
+*greeting-ui smoke tests*
+
+Add your smoke tests so that they match the smoke profile as defined in the `greeting-ui` `pom.xml` file. These will be executed on Concourse against the `greeting-ui` application deployed in the Cloud Foundry `scp-test-greeting-ui` space. Two versions of these tests are executed against the app:
+
+. the current version, in the `test-smoke` job
+. the latest prod version, in the `test-rollback-smoke` job
+
+image::{cf-migration-root-docs}/greeting_ui_smoke_tests.png[title="greeting-ui Smoke Tests"]
+
+Since `fortune-service` is not deployed to the `scp-test-greeting-ui` space, we expect to receive the Hystrix fallback response defined in `greeting-ui`. Hence, our smoke test validates that condition:
+```java
+package smoke;
+
+import org.assertj.core.api.BDDAssertions;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.web.client.RestTemplate;
+
+@RunWith(SpringRunner.class)
+@SpringBootTest(classes = SmokeTests.class,
+        webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@EnableAutoConfiguration
+public class SmokeTests {
+
+    Logger logger = LoggerFactory
+            .getLogger(SmokeTests.class);
+
+    @Value("${application.url}") String applicationUrl;
+
+    RestTemplate restTemplate = new RestTemplate();
+
+    @Test
+    public void should_return_a_fallback_fortune() {
+        ResponseEntity<String> response = this.restTemplate
+                .getForEntity("http://" + this.applicationUrl + "/", String.class);
+
+        logger.info("Response: [{}]", response);
+        BDDAssertions.then(response.getStatusCodeValue()).isEqualTo(200);
+
+        // Expect the hystrix fallback response
+        BDDAssertions.then(response.getBody()).contains("This fortune is no good. Try another.");
+    }
+
+}
+```
+
+*greeting-ui e2e tests*
+
+Add your e2e tests so that they match the e2e profile as defined in the `greeting-ui` `pom.xml` file. These will be executed on Concourse against the `greeting-ui` application deployed in the Cloud Foundry `scp-stage` space. This space is shared, so we assume `fortune-service` is also present.
+
+image::{cf-migration-root-docs}/greeting_ui_e2e_tests.png[title="greeting-ui E2E Tests"]
+
+In the e2e environment, we choose to verify that we are hitting `fortune-service` and not receiving the Hystrix fallback response from `greeting-ui`:
+
+```java
+package e2e;
+
+import org.assertj.core.api.BDDAssertions;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.web.client.RestTemplate;
+
+@RunWith(SpringRunner.class)
+@SpringBootTest(classes = E2eTests.class,
+        webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@EnableAutoConfiguration
+public class E2eTests {
+
+    Logger logger = LoggerFactory
+            .getLogger(E2eTests.class);
+
+    @Value("${application.url}") String applicationUrl;
+
+    RestTemplate restTemplate = new RestTemplate();
+
+    @Test
+    public void should_return_a_fortune() {
+        ResponseEntity<String> response = this.restTemplate
+                .getForEntity("http://" + this.applicationUrl + "/", String.class);
+
+        logger.info("Response: [{}]", response);
+        BDDAssertions.then(response.getStatusCodeValue()).isEqualTo(200);
+
+        // Filter out the known Hystrix fallback response
+        BDDAssertions.then(response.getBody()).doesNotContain("This fortune is no good. Try another.");
+    }
+
+}
+```
+
+===== 2.3 Add database versioning
+
+===== 2.4 ...
+
+===== 2.5 ...
+
+===== Stage 2 Recap
+
+What have we accomplished?
+
+* Blah
+- Blah Blah
+
+Next steps:
+
+Blah blah blah
 
 ==== Stage 3: Contracts
+
+===== Stage 3 Recap
+
+What have we accomplished?
+
+* Blah
+- Blah Blah
+
+Next steps:
+
+Blah blah blah
