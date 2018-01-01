@@ -4578,11 +4578,151 @@ public class E2eTests {
 }
 ```
 
-===== 2.3 Add database versioning
+===== 2.3 Enable database versioning
 
-===== 2.4 ...
+At this point will also incorporate https://flywaydb.org/[Flyway], an OSS database migration tool, to track database schema versions and handle schema changes and data loading.
 
-===== 2.5 ...
+This change only needs to be made to `fortune-service`, since it owns the interaction with `fortune-db`.
+
+We first add the flyway dependency to the `fortune-service` `pom.xml`. We need not add a version as Spring Boot will take care of that for us.
+
+```xml
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+    <dependency>
+```
+
+Next, we add SQL statements to create and populate our database table using Flyway's file naming convention:
+
+image::{cf-migration-root-docs}/fortune_service_flyway_file_name.png[title="fortune-service Flyway File Name"]
+
+Not the filename specifies the version (`V1`), followed by two underscore characters, as per Flyway convention. The location of the file is also aligned with Flyway convention.
+
+In this file, we place our CREATE TABLE and INSERT statements:
+
+```sql
+CREATE TABLE fortune (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  text varchar(255) not null
+);
+
+INSERT INTO fortune (text) VALUES ('Do what works.');
+
+INSERT INTO fortune (text) VALUES ('Do the right thing.');
+
+INSERT INTO fortune (text) VALUES ('Always be kind.');
+
+INSERT INTO fortune (text) VALUES ('You learn from your mistakes... You will learn a lot today.');
+
+INSERT INTO fortune (text) VALUES ('You can always find happiness at work on Friday.');
+
+INSERT INTO fortune (text) VALUES ('You will be hungry again in one hour.');
+
+INSERT INTO fortune (text) VALUES ('Today will be an awesome day!');
+```
+
+Now that we are relying on explicit SQL statements to create and populate the schema, we need to disable auto-generation via JPA. Instead we set auto-ddl to `validate`, which will validate the schema against the application entities and throw an error in case of a mismatch, but not actually generate the schema:
+```yml
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+```
+
+There are a few options for where to store the `ddl-auto` configuration, both in terms of location (in the `fortune-service` app or on the `app-config` GitHub repo) and in terms of file name. In this example, we will update the application.yml in the `fortune-service` app for local testing, but we will also save these values in a file called `application-flyway.yml` on the `app-config` repo. Create this file and push it to your fork of https://github.com/ciberkleid/app-config[app-config].
+
+By convention, `fortune-service` will pick up the configurations in `application-flyway.yml` if the string `flyway` is in the list of active Spring profiles. Thus, we add `flyway` to the environment variable `SPRING_PROFILES_ACTIVE` via the `fortune-service` `manifest.yml`:
+
+```yml
+---
+applications:
+- name: fortune-service
+  timeout: 120
+  services:
+  - fortune-db
+  - config-server
+  - cloud-bus
+  - service-registry
+  - circuit-breaker-dashboard
+  env:
+    SPRING_PROFILES_ACTIVE: flyway
+    JAVA_OPTS: -Djava.security.egd=file:///dev/urandom
+    TRUST_CERTS: api.run.pivotal.io
+```
+
+Finally, we remove old code that populated the database. In our sample app, this was found in class `io.pivotal.FortuneServiceApplication`. The following shows the code we now remove:
+
+```java
+@Bean
+    CommandLineRunner loadDatabase(FortuneRepository fortuneRepo) {
+        return args -> {
+//            logger.debug("loading database..");
+//            fortuneRepo.save(new Fortune(1L, "Do what works."));
+//            fortuneRepo.save(new Fortune(2L, "Do the right thing."));
+//            fortuneRepo.save(new Fortune(3L, "Always be kind."));
+//            fortuneRepo.save(new Fortune(4L, "You learn from your mistakes... You will learn a lot today."));
+//            fortuneRepo.save(new Fortune(5L, "You can always find happiness at work on Friday."));
+//            fortuneRepo.save(new Fortune(6L, "You will be hungry again in one hour."));
+//            fortuneRepo.save(new Fortune(7L, "Today will be an awesome day!"));
+            logger.debug("record count: {}", fortuneRepo.count());
+            fortuneRepo.findAll().forEach(x -> logger.debug(x.toString()));
+        };
+
+    }
+```
+
+We also no longer need the Fortune entity constructors, so we can comment these out in class `io.pivotal.fortune.Fortune` as shown below:
+```java
+//    public Fortune() {
+//    }
+//
+//    public Fortune(Long id, String text) {
+//        super();
+//        this.id = id;
+//        this.text = text;
+//    }
+```
+
+With that, we have completed the setup for Flyway and our database schema is now versioned. As long as we follow Flyway conventions for future schema changes, Flyway will take care of migrating the database for us. During the test phase, Flyway will create or update the database schema in the `test-deploy` job and run smoke tests in the `test-smoke` job. It will also retrieve the last production jar of the application and test that against the updated schema in the `test-rollback`deploy` and `test-rollback-smoke` jobs. This ensures that we can roll back the application in prod if a problem is discovered after the prod database schema has been updated, and avoid the burden of rolling back the database.
+
+===== 2.4 Push changes to GitHub
+
+For `greeting-ui`, you should be pushing the following new or modified files:
+
+* pom.xml
+* src/test/java/e2e/E2eTests.java
+* src/test/java/io/pivotal/GreetingUIApplicationTests.java
+* src/test/java/smoke/SmokeTests.java
+
+
+For `fortune-service`, you should be pushing the following new or modified files:
+
+* pom.xml
+* src/test/java/e2e/E2eTests.java
+* src/test/java/io/pivotal/FortuneServiceApplicationTests.java
+* src/test/java/smoke/SmokeTests.java
+* src/main/resources/db/migration/V1__init.sql
+* src/main/resources/application.yml
+* manifest.yml
+* src/main/java/io/pivotal/FortuneServiceApplication.java
+* src/main/java/io/pivotal/fortune/Fortune.java
+
+For `app-config`, you should be pushing the following new or modified files:
+
+* application-flyway.yml
+
+
+===== 2.5 Re-run the pipelines
+
+If you run through the pipelines again and view the output for the jobs that run default, smoke, and e2e tests, you will now see that the tests we added were executed.
+
+As you run through the pipelines a second time, you will see the tests from the latest prod version run against the database in the `test-rollback-smoke` job. In this case there is no schema upgrade, but nonetheless the test confirm that the last prod version can be used with the current database schema.
+
+You can see the database version information stored in the database by Flyway either by querying the database itself or by hitting the flyway endpoint on the `fortune-service` URL. Here is an example from the scp-stage environment:
+
+image::{cf-migration-root-docs}/fortune_service_flyway_schema_info.png[title="fortune-service Flyway Schema Info"]
 
 ===== Stage 2 Recap
 
