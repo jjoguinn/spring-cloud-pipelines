@@ -5210,7 +5210,7 @@ By implementing a contract-driven approach with auto-generation of tests and stu
 
 === Conclusion
 
-This concludes the tutorial on migrating apps for Spring Cloud Pipelines on Cloud Foundry.
+This concludes the tutorial on migrating apps for Spring Cloud Pipelines for Cloud Foundry.
 
 Moving forward, the refactoring work needed here can be incorporated into your and/or your team's standard practices. In short:
 
