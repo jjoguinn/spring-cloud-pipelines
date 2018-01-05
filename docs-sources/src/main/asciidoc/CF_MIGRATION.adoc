@@ -128,7 +128,7 @@ Make sure all four files are tracked by Git. For example, you can add the follow
 
 We are using Bintray as the maven repository. Bintray requires that a package exist before any app artifacts can be uploaded.
 
-Log into the Bintray UI and create the packages as follows.You can use the `Import from GitHub` option to create these:
+Log into the Bintray UI and create the packages as follows. You can use the `Import from GitHub` option to create these:
 
 image::{cf-migration-root-docs}/bintray_packages.png[title="Bintray Packages"]
 
@@ -205,7 +205,7 @@ m2-settings-repo-id: bintray
 m2-settings-repo-username: ciberkleid
 m2-settings-repo-password: my-super-secret-api-token
 
-repo-with-binaries: https://dl.bintray.com/ciberkleid/maven-repo
+repo-with-binaries: https://ciberkleid@my-super-secret-api-token@dl.bintray.com/ciberkleid/maven-repo
 
 repo-with-binaries-for-upload: https://api.bintray.com/maven/ciberkleid/maven-repo/fortune-service
 ```
@@ -449,7 +449,7 @@ On Cloud Foundry, you will now see the apps deployed in the test, stage, and pro
 
 image::{cf-migration-root-docs}/cf_test_and_prod_deployed.png[title="Cloud Foundry Test and Prod Deployment"]
 
-===== Stage 1 Recap
+===== Stage 1 Recap & next steps
 
 What have we accomplished?
 
@@ -460,8 +460,6 @@ What have we accomplished?
 - upload the app artifacts to the maven repo (Bintray)
 - tag the GitHub repositories with `dev/<version_number>` and `prod/<version_number>`
 * After each successful pipeline run, we are in a position to roll back to the last deployed version using the `prod-rollback` job, if necessary
-
-Next steps:
 
 These accomplishments are extremely valuable, but in order to derive confidence and reliability from the pipelines, we need to incorporate testing. We do this in Stage 2 of the app migration.
 
@@ -684,8 +682,6 @@ package e2e;
 import org.assertj.core.api.BDDAssertions;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -699,13 +695,9 @@ import org.springframework.web.client.RestTemplate;
 @EnableAutoConfiguration
 public class E2eTests {
 
-
 	// The app is running in CF but the tests are executed from Concourse worker,
 	// so the test will deduce the url to greeting-ui: it will assume the same host
 	// as fortune-service, and simply replace "fortune-service" with "greeting-ui" in the url
-
-	Logger logger = LoggerFactory
-			.getLogger(E2eTests.class);
 
 	@Value("${application.url}") String applicationUrl;
 
@@ -716,7 +708,6 @@ public class E2eTests {
 		ResponseEntity<String> response = this.restTemplate
 				.getForEntity("http://" + this.applicationUrl.replace("fortune-service", "greeting-ui") + "/", String.class);
 
-		logger.info("Response: [{}]", response);
 		BDDAssertions.then(response.getStatusCodeValue()).isEqualTo(200);
 
 		// Filter out the known Hystrix fallback responses from both fortune and greeting
@@ -768,8 +759,6 @@ package smoke;
 import org.assertj.core.api.BDDAssertions;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -783,9 +772,6 @@ import org.springframework.web.client.RestTemplate;
 @EnableAutoConfiguration
 public class SmokeTests {
 
-    Logger logger = LoggerFactory
-            .getLogger(SmokeTests.class);
-
     @Value("${application.url}") String applicationUrl;
 
     RestTemplate restTemplate = new RestTemplate();
@@ -795,7 +781,6 @@ public class SmokeTests {
         ResponseEntity<String> response = this.restTemplate
                 .getForEntity("http://" + this.applicationUrl + "/", String.class);
 
-        logger.info("Response: [{}]", response);
         BDDAssertions.then(response.getStatusCodeValue()).isEqualTo(200);
 
         // Expect the hystrix fallback response
@@ -819,8 +804,6 @@ package e2e;
 import org.assertj.core.api.BDDAssertions;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -830,28 +813,24 @@ import org.springframework.web.client.RestTemplate;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = E2eTests.class,
-        webEnvironment = SpringBootTest.WebEnvironment.NONE)
+		webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @EnableAutoConfiguration
 public class E2eTests {
 
-    Logger logger = LoggerFactory
-            .getLogger(E2eTests.class);
+	@Value("${application.url}") String applicationUrl;
 
-    @Value("${application.url}") String applicationUrl;
+	RestTemplate restTemplate = new RestTemplate();
 
-    RestTemplate restTemplate = new RestTemplate();
+	@Test
+	public void should_return_a_fortune() {
+		ResponseEntity<String> response = this.restTemplate
+				.getForEntity("http://" + this.applicationUrl + "/", String.class);
 
-    @Test
-    public void should_return_a_fortune() {
-        ResponseEntity<String> response = this.restTemplate
-                .getForEntity("http://" + this.applicationUrl + "/", String.class);
+		BDDAssertions.then(response.getStatusCodeValue()).isEqualTo(200);
 
-        logger.info("Response: [{}]", response);
-        BDDAssertions.then(response.getStatusCodeValue()).isEqualTo(200);
-
-        // Filter out the known Hystrix fallback response
-        BDDAssertions.then(response.getBody()).doesNotContain("This fortune is no good. Try another.");
-    }
+		// Filter out the known Hystrix fallback response
+		BDDAssertions.then(response.getBody()).doesNotContain("This fortune is no good. Try another.");
+	}
 
 }
 ```
@@ -860,9 +839,11 @@ public class E2eTests {
 
 At this point will also incorporate https://flywaydb.org/[Flyway], an OSS database migration tool, to track database schema versions and handle schema changes and data loading.
 
-This change only needs to be made to `fortune-service`, since it owns the interaction with `fortune-db`.
+This change only needs to be made to `fortune-service`, since `fortune-service` owns the interaction with `fortune-db`.
 
-We first add the flyway dependency to the `fortune-service` `pom.xml`. We need not add a version as Spring Boot will take care of that for us.
+*Add Flyway dependency*
+
+We first add the Flyway dependency to the `fortune-service` `pom.xml`. We need not add a version as Spring Boot will take care of that for us.
 
 ```xml
     <dependency>
@@ -872,13 +853,15 @@ We first add the flyway dependency to the `fortune-service` `pom.xml`. We need n
     <dependency>
 ```
 
-Next, we add SQL statements to create and populate our database table using Flyway's file naming convention:
+*Create Flyway migration*
+
+Next, we create a migration directory and our initial migration file following Flyway's file naming convention:
 
 image::{cf-migration-root-docs}/fortune_service_flyway_file_name.png[title="fortune-service Flyway File Name"]
 
-Not the filename specifies the version (`V1`), followed by two underscore characters, as per Flyway convention. The location of the file is also aligned with Flyway convention.
+Note the filename specifies the version (`V1`), followed by two underscore characters.
 
-In this file, we place our CREATE TABLE and INSERT statements:
+We place our CREATE TABLE and INSERT statements in our `src/main/resources/db/migration/V1__init.sql` file:
 
 ```sql
 CREATE TABLE fortune (
@@ -900,8 +883,9 @@ INSERT INTO fortune (text) VALUES ('You will be hungry again in one hour.');
 
 INSERT INTO fortune (text) VALUES ('Today will be an awesome day!');
 ```
+*Disable JPA DDL initialization*
 
-Now that we are relying on explicit SQL statements to create and populate the schema, we need to disable auto-generation via JPA. Instead we set auto-ddl to `validate`, which will validate the schema against the application entities and throw an error in case of a mismatch, but not actually generate the schema:
+Now that we are relying on Flyway to create and populate the schema, we need to disable JPA-based database initialization. We can set `ddl-auto` to `validate`, which will validate the schema against the application entities and throw an error in case of a mismatch, but not actually generate the schema:
 ```yml
 spring:
   jpa:
@@ -909,7 +893,7 @@ spring:
       ddl-auto: validate
 ```
 
-There are a few options for where to store the `ddl-auto` configuration, both in terms of location (in the `fortune-service` app or on the `app-config` GitHub repo) and in terms of file name. In this example, we will update the application.yml in the `fortune-service` app for local testing, but we will also save these values in a file called `application-flyway.yml` on the `app-config` repo. Create this file and push it to your fork of https://github.com/ciberkleid/app-config[app-config].
+There are a few options for where to store the `ddl-auto` configuration, both in terms of location (in the `fortune-service` app or on the `app-config` GitHub repo) and in terms of file name. For this example, update the `application.yml` in the `fortune-service` app for local testing. additionally, save these values in a new file called `application-flyway.yml` on your fork of https://github.com/ciberkleid/app-config[app-config].
 
 By convention, `fortune-service` will pick up the configurations in `application-flyway.yml` if the string `flyway` is in the list of active Spring profiles. Thus, we add `flyway` to the environment variable `SPRING_PROFILES_ACTIVE` via the `fortune-service` `manifest.yml`:
 
@@ -929,8 +913,9 @@ applications:
     JAVA_OPTS: -Djava.security.egd=file:///dev/urandom
     TRUST_CERTS: api.run.pivotal.io
 ```
+*Remove non-Flyway data loading*
 
-Finally, we remove old code that populated the database. In our sample app, this was found in class `io.pivotal.FortuneServiceApplication`. The following shows the code we now remove:
+We can now remove the old code that populated the database. In our sample app, this was found in class `io.pivotal.FortuneServiceApplication`. The following shows the code we now remove:
 
 ```java
 @Bean
@@ -963,7 +948,13 @@ We also no longer need the Fortune entity constructors, so we can comment these 
 //    }
 ```
 
-With that, we have completed the setup for Flyway and our database schema is now versioned. As long as we follow Flyway conventions for future schema changes, Flyway will take care of migrating the database for us. During the test phase, Flyway will create or update the database schema in the `test-deploy` job and run smoke tests in the `test-smoke` job. It will also retrieve the last production jar of the application and test that against the updated schema in the `test-rollback`deploy` and `test-rollback-smoke` jobs. This ensures that we can roll back the application in prod if a problem is discovered after the prod database schema has been updated, and avoid the burden of rolling back the database.
+*Flyway integration summary*
+
+With that, we have completed the setup for Flyway and our database schema is now versioned. From this point onward, Spring Boot will call `Flyway.migrate()` to perform the database migration. As long as we follow Flyway conventions for future schema changes, Flyway will take care of tracking the schema version and migrating the database for us.
+
+From a rollback perspective, Spring Cloud Pipelines includes two jobs in the `test` phase - `test-rollback-deploy` and `test-rollback-smoke` - wherein it validates that the latest prod jar works against the newly updated database. The purpose is to ensure that we can roll back the application in prod if a problem is discovered after the prod database schema has been updated, and avoid the burden of rolling back the database.
+
+Read more about https://docs.spring.io/spring-boot/docs/current/reference/html/howto-database-initialization.html#howto-use-a-higher-level-database-migration-tool[Spring Boot database initialization with Flyway] for further information, including Flyway configuration options.
 
 ===== 2.4 Push changes to GitHub
 
@@ -994,34 +985,536 @@ For `app-config`, you should be pushing the following new or modified files:
 
 ===== 2.5 Re-run the pipelines
 
-If you run through the pipelines again and view the output for the jobs that run default, smoke, and e2e tests, you will now see that the tests we added were executed.
+Run through the pipelines again and view the output for the jobs that run the default, smoke, and e2e tests. You will see that the tests we added in this stage were executed.
 
-As you run through the pipelines a second time, you will see the tests from the latest prod version run against the database in the `test-rollback-smoke` job. In this case there is no schema upgrade, but nonetheless the test confirm that the last prod version can be used with the current database schema.
+As you run through the pipelines a second time, you will see the smoke tests from the latest prod version run against the database in the `test-rollback-smoke` job. In this case there is no schema upgrade, but nonetheless the tests confirm that the latest prod version of the app can be used with the current database schema.
 
 You can see the database version information stored in the database by Flyway either by querying the database itself or by hitting the flyway endpoint on the `fortune-service` URL. Here is an example from the scp-stage environment:
 
 image::{cf-migration-root-docs}/fortune_service_flyway_schema_info.png[title="fortune-service Flyway Schema Info"]
 
-===== Stage 2 Recap
+===== Stage 2 Recap & next steps
 
 What have we accomplished?
 
-* Blah
-- Blah Blah
+* By integrating our applications with the testing strategy built into Spring Cloud Pipelines, we have increased the effectiveness of the pipelines, as well as our confidence in them
+* Established a standard approach to organizing tests that will bring consistency within and across development teams
+* Enabled auto-managed database versioning and backward compatibility testing that will alleviate database schema management throughout the release management lifecycle
 
-Next steps:
+We are now positioned to add any unit, integration, smoke, and end-to-end tests to our code base and extract a very high level of reliability and confidence from our pipelines. We are also better positioned to ensure that our dev teams conform to these practices, given the structure imposed by Spring Cloud Pipelines and the fast feedback and visibility we gain from the pipelines as they execute the tests.
 
-Blah blah blah
+However, we could benefit further by incorporating contracts to define and test the API integration points between applications. We do this in Stage 3 of the app migration.
 
 ==== Stage 3: Contracts
+
+In this stage, we introduce contract-based programming practices into our sample application. Doing so improves API management capabilities, including defining, communicating, and testing API semantics. It also enables us to catch breaking API changes (i.e. validate API backward compatibility) in the build phase. This will extend the effectiveness of the pipelines, encourage better communication and programming practices across development teams, and provide faster feedback to developers.
+
+We will integrate Spring Cloud Contract and add contracts, stubs, and a stub runner. We will also now complete and make use of the apicompatibility profile defined in Stage 2.
+
+===== 3.1 Create a contract
+
+Let's start by creating the contract for the interaction between `greeting-ui` and `fortune-service`. The contract should describe the following expectation:
+
+* `greeting-ui` makes a `GET` request to the root URL of `fortune-service` and expects a response with status 200 and a string ("foo fortune") in the body
+
+We codify this using groovy syntax as follows:
+
+```groovy
+import org.springframework.cloud.contract.spec.Contract
+
+Contract.make {
+    description("""
+should return a fortune string
+""")
+    request {
+        method GET()
+        url "/"
+    }
+    response {
+        status 200
+        body "foo fortune"
+    }
+}
+```
+
+Save this contract in the `fortune-service` code base in the following location, which is compliant with Spring Cloud Contract convention (`src/test/resources/contracts/<service-name>/<contract-file>`):
+
+image::{cf-migration-root-docs}/fortune_service_contract_file.png[title="fortune-service Flyway Contract File"]
+
+Side note: you can optionally enable your IDE to assist with contract syntax by adding the Spring Cloud Contract Verifier to your `pom.xml` file. It is pluggable, and includes groovy and pact by default.
+
+```xml
+    <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-contract-verifier</artifactId>
+      <scope>test</scope>
+    </dependency>
+```
+
+===== 3.2 Create a base class for contract tests
+
+Now that we have a codified contract, we want to enable auto-generation of contract-based tests. The auto-generation, which we will configure in the next steps, requires a base class that stubs out the service that satisfies the API call, so that we can run the test without external dependencies (e.g. the DB). The objective is to focus on testing API semantics.
+
+We create the base class in the `fortune-service` test package as follows:
+
+
+```java
+package io.pivotal.fortune;
+
+import io.restassured.module.mockmvc.RestAssuredMockMvc;
+import org.junit.Before;
+import org.mockito.BDDMockito;
+
+public class BaseClass {
+
+    @Before
+    public void setup() {
+        FortuneService service = BDDMockito.mock(FortuneService.class);
+        BDDMockito.given(service.getFortune()).willReturn("foo fortune");
+        RestAssuredMockMvc.standaloneSetup(new FortuneController(service));
+    }
+}
+```
+
+===== 3.3 Enable automated contract-based testing
+
+Now that we have a contract and a base class, we can use the *Spring Cloud Contract maven plugin* to auto-generate contract tests, stubs, and a stub jar.
+
+First we add the Spring Cloud Contract version to the list of properties in the `fortune-service` `pom.xml` file, since we will reference it when we enable the Spring Cloud Contract maven plugin:
+
+```xml
+  <properties>
+...
+    <spring-cloud-contract.version>1.2.1.RELEASE</spring-cloud-contract.version>
+...
+</properties>
+```
+
+Next, we edit the `default` profile in the `fortune-service` `pom.xml` file as follows:
+
+* Add a plugin block for Spring Cloud Contract maven plugin
+* Configure it to use our base class (`io.pivotal.fortune.BaseClass`) to generate tests
+* Configure it to place auto-generated tests in the test package `io.pivotal.fortune.contracttests`
+
+Note that the package of the contracttests will be included by the `include` filter in the `default` profile, so these tests will be run against the app during the `build-and-upload` job. For `fortune-service`, this serves to validate that the app conforms to the contract.
+
+Here is the complete profile:
+```xml
+    <profile>
+      <id>default</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <includes>
+                <include>**/*Tests.java</include>
+                <include>**/*Test.java</include>
+              </includes>
+              <excludes>
+                <exclude>**/smoke/**</exclude>
+                <exclude>**/e2e/**</exclude>
+              </excludes>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+          </plugin>
+          <!--Spring Cloud Contract maven plugin -->
+          <plugin>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-contract-maven-plugin</artifactId>
+            <version>${spring-cloud-contract.version}</version>
+            <extensions>true</extensions>
+            <configuration>
+              <baseClassForTests>io.pivotal.fortune.BaseClass</baseClassForTests>
+              <basePackageForTests>io.pivotal.fortune.contracttests</basePackageForTests>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+```
+
+When the app is built, the Spring Cloud Contract maven plugin will also now produce a stub and a stub jar containing the contract and stub. This stub jar will be uploaded to Bintray, along with the usual app jar. As we will see shortly, this stub jar can be used by the `greeting-ui` dev team while they wait for `fortune-service` to be completed. Note that this gives the `greeting-ui` dev team a producer to test against that is based on a mutually agreed-upon contract without the lead time of having to wait for `fortune-service` to implement anything more than a base class, and without having to manually stub out calls to `fortune-service` based on arbitrary or static responses.
+
+Side note: package the project locally (run `mvn package`) to observe the tests, stubs, and stub jar that the Spring Cloud Contract maven plugin generates:
+
+image::{cf-migration-root-docs}/fortune_service_generated_tests.png[title="Generated Tests and Stubs"]
+
+===== 3.4 Enable backward compatibility API check
+
+To enable Spring Cloud Pipelines to catch any breaking API changes during the `build-api-compatibility-check` job, we add the Spring Cloud Contract maven plugin to the `apicompatibility` profile as well.
+
+In this case, we want the plugin to generate tests based on contracts outside of the project (the ones from the latest prod version), so we configure the plugin to download the latest prod stub jar, which contains the old contract. The plugin will use the old contract and the specified base class, which in our example is the same as the one in the previous step, to generate contract tests. These tests are run against the new code to validate that it is still compatible with consumers complying with the prior contract. This ensures backward compatibility for the API.
+
+In short, we edit the apicompatibility profile in the `fortune-service` `pom.xml` file as follows:
+
+* Add a plugin block for Spring Cloud Contract maven plugin
+* Configure it to download the latest prod stub jar from Bintray to obtain the old contract
+* Configure it to use our base class (`io.pivotal.fortune.BaseClass`) to generate tests (we are using the same one as in the prrior step)
+* Configure it to place auto-generated tests in the test package `io.pivotal.fortune.contracttests`
+
+Note that the package of the contracttests matches the `include` filter in the `apicompatibility` profile, so these tests will be run against the app during the `build-api-compatibility-check` job. For `fortune-service`, this serves to validate that the app conforms to the old contract.
+
+Here is the complete profile:
+
+```xml
+    <profile>
+      <id>apicompatibility</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <includes>
+                <include>**/contracttests/**/*Tests.java</include>
+                <include>**/contracttests/**/*Test.java</include>
+              </includes>
+            </configuration>
+          </plugin>
+          <!--Spring Cloud Contract maven plugin -->
+          <plugin>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-contract-maven-plugin</artifactId>
+            <version>${spring-cloud-contract.version}</version>
+            <extensions>true</extensions>
+            <configuration>
+              <contractsRepositoryUrl>${repo.with.binaries}</contractsRepositoryUrl>
+              <contractDependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>${project.artifactId}</artifactId>
+                <classifier>stubs</classifier>
+                <version>${latest.production.version}</version>
+              </contractDependency>
+              <contractsPath>/</contractsPath>
+              <baseClassForTests>io.pivotal.fortune.BaseClass</baseClassForTests>
+              <basePackageForTests>io.pivotal.fortune.contracttests</basePackageForTests>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+```
+
+The values for `${repo.with.binaries}` and `${latest.production.version}` will be injected dynamically by Spring Cloud Pipelines. You can run this locally by providing these values manually as system properties in the maven command.
+
+===== 3.5 Push changes to GitHub
+
+All changes in Stage 3 thus far are in `fortune-service`. At this point, you should be pushing the following new or modified files:
+
+* pom.xml
+* src/test/resources/contracts/greeting-ui/shouldReturnAFortune.groovy
+* src/test/java/io/pivotal/fortune/BaseClass.java
+
+===== 3.6 Re-run the fortune-service pipeline
+
+Run through the `fortune-service` pipeline to generate stubs. The following output from the `build-and-upload` job shows the auto-generation of tests and stubs:
+
+image::{cf-migration-root-docs}/fortune_service_build_and_upload_test_and_stub_generation.png[title="fortune-service build-and-upload Test and Stub Generation"]
+
+You will also see output in the `build-and-upload` job showing the execution of these tests against the code.
+
+Additionally, you will see the stub jar uploaded to Bintray along with the usual app jar.
+
+Finally, as you run through the pipeline a second time, you will see the contract tests from the latest prod version run against the new code in the output of the `build-api-compatibility-check` job. In this case there is no API change, but nonetheless the tests confirm that the latest prod version of the API can be used with the current code base.
+
+===== 3.7 Enable stubs for integration tests
+
+We are in the home stretch! Let's turn our attention to `greeting-ui`.
+
+The following image compares the path of a request through `greeting-ui` in the build phase, both with and without stubs.
+
+image::{cf-migration-root-docs}/greeting_ui_build_flow.png[title="greeting-ui Build Flow"]
+
+Without stubs, we expect the response to be the hystrix fallback response that is hard-coded in `greeting-ui`. With stubs, however, we can expect the response that was declared in the contract. In this case, the stubs are loaded into the `greeting-ui` process. This leads us to our next task: load the stubs produced by `fortune-service`.
+
+*Enable in-process stub runner*
+
+To load the stubs into the `greeting-ui` process, we must enable the Spring Cloud Contract Stub Runner dependency. This dependency will start an in-process stub runner that automatically configures Wiremock.
+
+Add the following to the `greeting-ui` `pom.xml` file:
+
+```xml
+<dependency>
+ <groupId>org.springframework.cloud</groupId>
+ <artifactId>spring-cloud-starter-contract-stub-runner</artifactId>
+ <scope>test</scope>
+</dependency>
+```
+
+*Add integration tests aligned with the contract*
+
+Next, we add integration tests to `greeting-ui` that test for the expected response declared in the contract.
+
+Add the following class to the test package in `greeting-ui`:
+
+```java
+package io.pivotal.fortune;
+
+import io.pivotal.GreetingUIApplication;
+import org.assertj.core.api.BDDAssertions;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cloud.contract.stubrunner.spring.AutoConfigureStubRunner;
+import org.springframework.test.context.junit4.SpringRunner;
+
+@RunWith(SpringRunner.class)
+@SpringBootTest(classes = GreetingUIApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE,
+        properties = {"spring.application.name=greeting-ui", "spring.cloud.circuit.breaker.enabled=false", "hystrix.stream.queue.enabled=false"})
+@AutoConfigureStubRunner(ids = {"io.pivotal:fortune-service:1.0.0.M1-20180102_203542-VERSION"},
+        repositoryRoot = "${REPO_WITH_BINARIES}"
+        //workOffline = true
+)
+
+public class FortuneServiceTests {
+
+    @Autowired FortuneService fortuneService;
+
+    @Test
+    public void shouldSendRequestToFortune() {
+        // when
+        String fortune = fortuneService.getFortune();
+        // then
+        BDDAssertions.then(fortune).isEqualTo("foo fortune");
+    }
+
+}
+```
+
+At this point, we can get through the build phase for `greeting-ui`, and the integration tests will be executed against the `fortune-service` stubs running in the `greeting-ui` process on the Concourse worker.
+
+Side notes:
+
+* Notice the configuration of `@AutoConfigureStubRunner` - you can replace the version with a `+` sign if using Artifactory or Nexus and it will automatically choose the latest available version on the maven repo.
+* Setting `workOffline=true` (commented out but shown for informational purposes above) would make the stub runner get the stubs from the local maven repo. This is useful for local testing. Alternatively, set the `$REPO_WITH_BINARIES` environment variable to the value used in the credentials file before doing a local maven build, and the local build will download the stubs from your remote maven repo (e.g. Bintray).
+
+===== 3.8 Enable stubs for smoke tests
+
+The following image compares the path of a request through `greeting-ui` in the test phase, both with and without stubs. Note that in the build phase, where the app process is running on the Concourse worker, we ran the stubs in the same process. In the test environment (Cloud Foundry), we will run the stubs in a separate process using a standalone stub runner application.
+
+image::{cf-migration-root-docs}/greeting_ui_test_flow.png[title="greeting-ui Test Flow"]
+
+As in the build phase, without stubs we expect the response to be the hystrix fallback response that is hard-coded in `greeting-ui`. With stubs, however, we can expect the response that was declared in the contract.
+
+We will rely on Spring Cloud Pipelines to:
+
+* Deploy a stub runner application
+* Provide the stub runner application the necessary information to download the stubs
+* Open a port on the stub runner application for each stub
+
+We will rely on the stub runner application to:
+
+* Download the stubs from our maven repo (Bintray)
+* Expose each stub on a separate port
+* Register each stub in the Service Discovery server
+
+The following steps describe how to configure this.
+
+*Provide standalone stub runner app jar*
+
+In the Prep step for this tutorial, you cloned the https://github.com/spring-cloud-samples/cloudfoundry-stub-runner-boot[cloudfoundry-stub-runner-boot] repo to your local machine. The next step is to build this app and upload it to Bintray to make the jar available to Spring Cloud Pipelines.
+
+As mentioned in Stage 1 of this tutorial, Bintray requires that a package exist before any app artifacts can be uploaded. Log into the Bintray UI and create a package for `cloudfoundry-stub-runner-boot`. If you forked this repo, you can use the `Import from GitHub` option. Otherwise, create the package manually and choose any license (e.g. Apache 2.0).
+
+Now you are ready to build and upload this app to Bintray. The following script shows cloning, building and uploading. Edit as appropriate to match your Bintray URL, the Bintray ID in your `~/.m2/settings/xml` file, and the `cloudfoundry-stub-runner-boot` repo URL if you chose to fork it.
+
+```bash
+# Edit to match your Bintray URL and M2 repo ID setting (check your ~/.m2/settings.xml file)
+MAVEN_REPO_URL=https://api.bintray.com/maven/ciberkleid/maven-repo/cloudfoundry-stub-runner-boot
+MAVEN_REPO_ID=bintray
+
+# Clone cloudfoundry-stub-runner-boot
+git clone https://github.com/spring-cloud-samples/cloudfoundry-stub-runner-boot.git
+cd cloudfoundry-stub-runner-boot
+
+# Build and upload
+./mvnw clean deploy -Ddistribution.management.release.url="${MAVEN_REPO_URL}" -Ddistribution.management.release.id="${MAVEN_REPO_ID}"
+```
+
+You should now see the `cloudfoundry-stub-runner-boot` artifacts uploaded on Bintray.
+
+*Provide standalone stub runner app manifest*
+
+Next, we add a manifest file for the stub runner app for deployment to Cloud Foundry.
+
+We will place this file in the `greeting-ui` repo. The file name and location can be your choice. For this example, we will use `sc-pipelines/manifest-stubrunner.yml`:
+
+image::{cf-migration-root-docs}/greeting_ui_stubrunner_manifest.png[title="greeting-ui Stub Runner Manifest"]
+
+We populate this `manifest-stubrunner.yml` with the content shown below so that the stub runner binds to `service-registry`. The stub runner will register the `fortune-service` stub there so that `greeting-ui` can discover it in the same way it will discover the actual `fortune-service` app endpoint in stage and prod. From the `greeting-ui` perspective, there is no difference in how it interacts with Eureka and the stub runner app in test and the way it will interact with Eureka and the `fortune-service` app in stage and prod.
+
+```yml
+---
+applications:
+- name: stubrunner
+  timeout: 120
+  services:
+  - service-registry
+  env:
+    JAVA_OPTS: -Djava.security.egd=file:///dev/urandom
+    TRUST_CERTS: api.run.pivotal.io
+```
+
+*Provide stub runner jar and manifest info to the pipeline*
+
+Now that we have a jar file and manifest file for our stub runner app, we need to provide this information to our `greeting-ui` pipeline so that the pipeline downloads the jar from Bintray and deploys it to Cloud Foundry. We do this through the `greeting-ui` `sc-pipelines.yml` file. We add an entry to the list of services in the `test` section, as follows:
+
+```yml
+    - name: stubrunner
+      type: stubrunner
+      coordinates: io.pivotal:cloudfoundry-stub-runner-boot:0.0.1.M1
+      pathToManifest: sc-pipelines/manifest-stubrunner.yml
+```
+
+Notice that `name` matches the name of the app in `manifest-stubrunner.yml`, `coordinates` corresponds to the jar coordinates on the maven repo, and `pathToManifest` matches our chosen fie name for the stub runner app manifest.
+
+Note also the `type` is set to `stubrunner`, which Spring Cloud Pipelines will recognize as a stanalone stub runner app and treat accordingly.
+
+*Provide stub configuration for stub runner app*
+
+The final steps in the configuration of the standalone stub runner app are:
+
+* Enable the stub runner app to download the `fortune-service` stub from Bintray
+* Open a second port on the container to receive requests for this stub
+
+To accomplish this, we put stub and port configuration information into the properties section of the `greeting-ui` `pom.xml` file, using a property called `stubrunner.ids`. This property can accept a list of stubrunner ids, but for this tutorial, we only have one:
+
+```xml
+  <properties>
+...
+    <!--Tell stub runner app to start this stub-->
+    <stubrunner.ids>io.pivotal:fortune-service:1.0.0.M1-20180102_203542-VERSION:stubs:10000</stubrunner.ids>
+  </properties>
+```
+
+Spring Cloud Pipelines will use this information in two ways:
+
+. It will provide this information to the stub runner app via the app's environment variables
+- Spring Cloud Pipelines will aslo provide the `$REPO_WITH_BINARIES` as an env var for the stub runner app
+- The stub runner app will use this information to download the stub from Bintray and expose it on the specified port
+. It will open the additional port specified on the stub runner app and map a new route to it
+- The format for each route will be `<stub-runner-app-name>-<hostname-uuid>-<env>-<app-name>-<port>.<domain>`
+- In our example, this would be `stubrunner-cyi-test-greeting-ui-10000.cfapps.io`
+
+Since we bound our stub runner app to `service-registry` (Eureka), the stub runner app will register the stub URL under the application name `FORTUNE-SERVICE` on Eureka:
+
+image::{cf-migration-root-docs}/greeting_ui_stub_runner_eureka_registration.png[title="greeting-ui Stub Runner Eureka Registration"]
+
+This completes the process of configuring the standalone stub runner application.
+
+Side note: The port configuration may be automated by Spring Cloud Pipelines in the future, such that it will not be necessary to include the port in the `stubrunner.ids`, but for the moment, we are required to specify the port each stub should use.
+
+*Edit smoke tests to align with the contract*
+
+Finally, we edit our smoke tests for `greeting-ui` to ensure the response does *not* contain the hystrix fallback, since we are noe expecting a response from the stub.
+
+```java
+package smoke;
+
+import org.assertj.core.api.BDDAssertions;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.web.client.RestTemplate;
+
+@RunWith(SpringRunner.class)
+@SpringBootTest(classes = SmokeTests.class,
+        webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@EnableAutoConfiguration
+public class SmokeTests {
+
+	@Value("${application.url}") String applicationUrl;
+
+	RestTemplate restTemplate = new RestTemplate();
+
+	@Test
+	public void should_return_a_fortune() {
+		ResponseEntity<String> response = this.restTemplate
+				.getForEntity("http://" + this.applicationUrl + "/", String.class);
+
+		BDDAssertions.then(response.getStatusCodeValue()).isEqualTo(200);
+
+		// Filter out the known Hystrix fallback response
+		BDDAssertions.then(response.getBody()).doesNotContain("This fortune is no good. Try another.");
+	}
+
+}
+```
+
+In this case, in contrast to the integration test we created earlier for `greeting-ui`, we do not include `@AutoConfigureStubRunner` since we are using a standalone stub runner application.
+
+===== 3.9 Push changes to GitHub
+
+Push contract-based changes for `greeting-ui`. You should be pushing the following new or modified files:
+
+* pom.xml
+* sc-pipelines.yml
+* sc-pipelines/manifest-stubrunner.yml
+* src/test/java/io/pivotal/fortune/FortuneServiceTests.java
+* src/test/java/smoke/SmokeTests.java
+
+At this point, we can run through the full pipeline for `greeting-ui` and leverage the contract-based stub in both the build and test environments.
 
 ===== Stage 3 Recap
 
 What have we accomplished?
 
-* Blah
-- Blah Blah
+By implementing a contract-driven approach with auto-generation of tests and stubs, we have introduced a clean, structured, and reliable way to define, communicate, document, manage and test APIs
 
-Next steps:
+* Inter-team communication will be simpler
+- Consumer and producer teams can now communicate requirements through codified contracts
+- The inventory of contracts serves as a record and reference for the agreed upon APIs
+* Developer productivity will increase
+- Producers can quickly and easily generate contract-based stubs
+- Consumers no longer have to manually stub out APIs and write tests with arbitrary hard-coded responses - instead they can use the auto-generated stubs and test for contract-based responses
+- Both producers and consumers can validate they are compliant with the contract
+- Producers can verify backward compatibility of API changes
+- Troubleshooting will be easier
+- Failure and feedback will be faster
 
-Blah blah blah
+
+==== Conclusion
+
+This concludes the tutorial on migrating apps for Spring Cloud Pipelines on Cloud Foundry.
+
+Moving forward, the refactoring work needed here can be incorporated into your and/or your team's standard practices. In short:
+
+*Good:*
+
+* Use maven or gradle wrappers
+* Include a Cloud Foundry manifest file in your app repo
+* Include a pipeline descriptor (`sc-manifest.yml`) in your app repo
+* Create an empty `version` branch in your app repo
+* Include artifact repository configuration in the pom.xml file
+* Align your Cloud Foundry spaces with Spring Cloud Pipelines model (isolated test space, shared stage and prod)
+
+*Better*
+
+* Include default, apicompatibility, smoke, and e2e profiles in the pom.xml file
+* Organize tests accordingly in your app repo
+
+*Best*
+
+* Use a database migration tool like flyway
+* Use contract-based API programming
+
+Implementing all the *"good"* practices above already positions you to instantly create pipelines for your apps usign Spring Cloud Pipelines. This is a huge win in terms of consistency and productivity, and standardization across development teams. Of course, this is an open source project, so it can be modified to meet your needs.
+
+Implementing the *"better"* practices will ensure the proper tests get run at the proper time. At that point you can add as much test coverage as you need to have high confidence in your pipelines.
+
+Implementing the *"best"* practices will give you additional confidence in your pipeline and encourage better programming practices for database version and API management across development teams. It will also give you higher confidence in your pipelines and enable you to avoid the cumbersome business of rolling back a database.
+
+Happy coding!
