@@ -3901,7 +3901,7 @@ Push the above changes to GitHub. You should be pushing the following to each of
 ===== 1.6 Add Spring Cloud Pipelines credentials file
 In `$SCP_HOME/credentials`, make two copies of the file `$SCP_HOME/spring-cloud-pipelines/concourse/credentials-sample-cf.yml`. Rename them as `credentials-fortune-service.yml` and `credentials-greeting-ui.yml`.
 
- Note: these files will contain credentials to you GitHub repo, your Bintray repo, and your Cloud Foundry foundation. Hence, we opt to put them in a separate directory. You may choose to store these files in a private git repo, but do not push them to a public repo.
+CAUTION: These files will contain credentials to you GitHub repo, your Bintray repo, and your Cloud Foundry foundation. Hence, we opt to put them in a separate directory. You may choose to store these files in a private git repo, but do not push them to a public repo.
 
 Edit the git properties of each credentials file. Make sure to replace the sample values shown below as appropriate. For `tools-branch`, you may opt to use a fixed release (use v1.0.0.M8 or later for Cloud Foundry). Leave other values as they are, we will update those in later steps.
 ```yml
@@ -4024,7 +4024,7 @@ The Cloud Foundry manifest created in the previous step includes the logical nam
 
 Add a file called `sc-pipelines.yml` to each app, and include the same list of services as in the corresponding `manifest.yml`. Add the necessary details such that Spring Cloud Pipelines can construct a `cf create-service` command.
 
- Note: The `type: broker' parameter shown below instructs Spring Cloud Pipelines to provision a service using `cf create-service'. Other service types are also supported: cups, syslog, route, app, and stubrunner.
+NOTE: The `type: broker' parameter shown below instructs Spring Cloud Pipelines to provision a service using `cf create-service'. Other service types are also supported: cups, syslog, route, app, and stubrunner.
 
 More specifically, for `greeting-ui`, create an `sc-pipelines.yml` file with the following content:
 
@@ -4093,7 +4093,7 @@ test:
 
 The values above assume deployment to Pivotal Web Services. If you are deploying to a different Cloud Foundry foundation, please update the values accordingly. Also, make sure to replace the `config-server` uri with the address of your fork of the https://github.com/ciberkleid/app-config[app-config] repo.
 
- Note the `useExisting: true` parameter above. By default, Spring Cloud Pipelines will delete and recreate services in the `test` space. To override this behavior and re-use existing services, we set `useExisting: true`.
+TIP: Notice the `useExisting: true` parameter above. By default, Spring Cloud Pipelines will delete and recreate services in the `test` space. To override this behavior and re-use existing services, we set `useExisting: true`. This is helpful in cases where services  may take time to provision and initialize, where there is no risk in re-using them between pipeline runs, or where it is desirable to retain the service instance from the last pipeline run (e.g. a database migration).
 
 ===== 1.10 Push changes to GitHub
 
@@ -4763,7 +4763,7 @@ Save this contract in the `fortune-service` code base in the following location,
 
 image::{cf-migration-root-docs}/fortune_service_contract_file.png[title="fortune-service Flyway Contract File"]
 
-Side note: you can optionally enable your IDE to assist with contract syntax by adding the Spring Cloud Contract Verifier to your `pom.xml` file. It is pluggable, and includes groovy and pact by default.
+NOTE: You can optionally enable your IDE to assist with contract syntax by adding the Spring Cloud Contract Verifier to your `pom.xml` file. It is pluggable, and includes groovy and pact by default.
 
 ```xml
     <dependency>
@@ -4865,7 +4865,7 @@ Here is the complete profile:
 
 When the app is built, the Spring Cloud Contract maven plugin will also now produce a stub and a stub jar containing the contract and stub. This stub jar will be uploaded to Bintray, along with the usual app jar. As we will see shortly, this stub jar can be used by the `greeting-ui` dev team while they wait for `fortune-service` to be completed. Note that this gives the `greeting-ui` dev team a producer to test against that is based on a mutually agreed-upon contract without the lead time of having to wait for `fortune-service` to implement anything more than a base class, and without having to manually stub out calls to `fortune-service` based on arbitrary or static responses.
 
-Side note: package the project locally (run `mvn package`) to observe the tests, stubs, and stub jar that the Spring Cloud Contract maven plugin generates:
+TIP: Package the project locally (run `mvn package`) to observe the tests, stubs, and stub jar that the Spring Cloud Contract maven plugin generates. See the image below for reference.
 
 image::{cf-migration-root-docs}/fortune_service_generated_tests.png[title="Generated Tests and Stubs"]
 
@@ -5014,10 +5014,9 @@ public class FortuneServiceTests {
 
 At this point, we can get through the build phase for `greeting-ui`, and the integration tests will be executed against the `fortune-service` stubs running in the `greeting-ui` process on the Concourse worker.
 
-Side notes:
+TIP: Notice the configuration of `@AutoConfigureStubRunner` - you can replace the version with a `+` sign if using Artifactory or Nexus and it will automatically choose the latest available version on the maven repo.
 
-* Notice the configuration of `@AutoConfigureStubRunner` - you can replace the version with a `+` sign if using Artifactory or Nexus and it will automatically choose the latest available version on the maven repo.
-* Setting `workOffline=true` (commented out but shown for informational purposes above) would make the stub runner get the stubs from the local maven repo. This is useful for local testing. Alternatively, set the `$REPO_WITH_BINARIES` environment variable to the value used in the credentials file before doing a local maven build, and the local build will download the stubs from your remote maven repo (e.g. Bintray).
+TIP: Setting `workOffline=true` (commented out but shown for informational purposes above) would make the stub runner get the stubs from the local maven repo. This is useful for local testing. Alternatively, set the `$REPO_WITH_BINARIES` environment variable to the value used in the credentials file before doing a local maven build, and the local build will download the stubs from your remote maven repo (e.g. Bintray).
 
 ===== 3.8 Enable stubs for smoke tests
 
@@ -5133,7 +5132,7 @@ image::{cf-migration-root-docs}/greeting_ui_stub_runner_eureka_registration.png[
 
 This completes the process of configuring the standalone stub runner application.
 
-Side note: The port configuration may be automated by Spring Cloud Pipelines in the future, such that it will not be necessary to include the port in the `stubrunner.ids`, but for the moment, we are required to specify the port each stub should use.
+NOTE: The port configuration may be automated by Spring Cloud Pipelines in the future, such that it will not be necessary to include the port in the `stubrunner.ids`, but for the moment, we are required to specify the port each stub should use.
 
 *Edit smoke tests to align with the contract*
 
