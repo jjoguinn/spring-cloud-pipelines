@@ -1486,7 +1486,7 @@ By implementing a contract-driven approach with auto-generation of tests and stu
 - Failure and feedback will be faster
 
 
-==== Conclusion
+=== Conclusion
 
 This concludes the tutorial on migrating apps for Spring Cloud Pipelines on Cloud Foundry.
 
