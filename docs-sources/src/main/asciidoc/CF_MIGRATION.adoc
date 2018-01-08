@@ -79,7 +79,7 @@ In `$SCP_HOME`, clone your forks of `greeting-ui` and `fortune-service`, as well
 - https://github.com/spring-cloud-samples/cloudfoundry-stub-runner-boot[cloudfoundry-stub-runner-boot]
 - https://github.com/spring-cloud/spring-cloud-pipelines[spring-cloud-pipelines]
 
-Finally, create a directory called ``$SCP_HOME`/credentials`. Leave it empty for now.
+Finally, create a directory called `$SCP_HOME/credentials`. Leave it empty for now.
 
 ==== Stage 1: Scaffolding
 
@@ -270,7 +270,7 @@ applications:
 
 The `TRUST_CERTS` variable is used by the Pivotal Spring Cloud Services (Config Server, Service Registry, and Circuit Breaker Dashboard), which we are using in this example. The value specified above assumes deployment to Pivotal Web Services. Update it accordingly if you are deploying to a different Cloud Foundry foundation, or you can leave it out altogether if you are replacing the Pivotal Spring Cloud Services with alternative implementations (e.g. deploying apps and exposing them as user-provided services).
 
-You may add additional values to the manifest files if you wish, for example if additional values are useful for any manual deployment you may still want to do, or desirable in your Spring Cloud Pipelines deployment. For example, an alternative manifest.yml for 'fortune-ui` could be as follows:
+You may add additional values to the manifest files if you wish, for example if additional values are useful for any manual deployment you may still want to do, or desirable in your Spring Cloud Pipelines deployment. For example, an alternative manifest.yml for `fortune-service` could be as follows:
 
 ```yml
 ---
